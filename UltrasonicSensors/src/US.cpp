@@ -68,17 +68,23 @@ void loop() {
    bool setSpeed(int16_t speed_rpm);
 
 
-   if (cm1 < proxValue) {
+   while (cm1 < proxValue) {
+    Lmotor.setSpeed(-120);
+    Rmotor.setSpeed(-120);
+    
+   } 
+   Lmotor.setSpeed(0);
+   Rmotor.setSpeed(0);
+
+  while (cm2 < proxValue) {
     Lmotor.setSpeed(-120);
     Rmotor.setSpeed(-120);
    }
 
-   if (cm2 < proxValue) {
-    Lmotor.setSpeed(-120);
-    Rmotor.setSpeed(-120);
-   }
+  Lmotor.setSpeed(0);
+  Rmotor.setSpeed(0);
 
-   if (cm3 < proxValue) {
+  while (cm3 < proxValue) {
     Lmotor.setSpeed(120);
     Rmotor.setSpeed(-120);
    }

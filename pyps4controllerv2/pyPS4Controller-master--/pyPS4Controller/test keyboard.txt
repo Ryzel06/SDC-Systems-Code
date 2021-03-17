@@ -1,0 +1,29 @@
+#include <Servo.h>
+#include <PS4BT.h>
+
+Servo myservo; // create servo object to control a servo
+
+
+void setup() {
+ Serial.begin(9600);
+ myservo.attach(9); // attaches the servo on pin 9 to the servo object
+ myservo.write(0); // on power on, move servo to central position
+ Serial.println("Welcome!"); // banner on connection with instructions
+ Serial.println("Use following keys to control SG90 Servo Motor");
+ Serial.println("a: moves to absolute position 180 dregrees");
+  Serial.println("s: moves to absolute position 0 dregrees");
+ Serial.println("d: no moves");
+}
+
+void loop() {
+ while(Serial.available()) {
+  Serial commands = Serial.readCommand(); // read the incoming data as string
+  Serial.println("I read string: "+ commands); // feedback of data received
+  receivedPos = commands.charAt(0); // convert to char to enable Switch Statement use
+  switch (receivedPos) {
+   case 'a': myservo.write(180); break;
+   case 's': myservo.write(90); break;
+   case 'd': myservo.write(0); break;
+   default: break;
+  }
+ }

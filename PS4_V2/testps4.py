@@ -42,16 +42,17 @@ class MyController(Controller):
     #LEFT JOYSTICKS = LEFT SERVO MOTOR MOVING FORWARD/BACKWARD/REST    
     def on_L3_up(self, value):
         print("Left Moving Forward...")
-        ser.write('A')
+        ser.write('F050')
         
 
     def on_L3_down(self, value):
         print("Left Moving Backwards...")
-        ser.write('C')
+        ser.write('B050')
 
     def on_L3_y_at_rest(self):
         #stops movement of left motor. DO NOT ASSIGN SERIAL.
         print("Stopped..")
+        ser.write('F000')
 
     #RIGHT JOYSTICKS = RIGHT SERVO MOTOR MOVING FORWARD/BACKWARD/REST 
     def on_R3_up(self, value):

@@ -1,0 +1,433 @@
+#include <Adafruit_VL6180X.h>
+#include <Wire.h>
+#include "Feedback360Servo.h"
+#include <NewPing.h>
+
+using namespace feedback_servo;
+
+#define TRIGGER_PIN1  2  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_PIN1     4  // (previously 3) Arduino pin tied to echo pin on the ultrasonic sensor.
+
+#define TRIGGER_PIN2  6  // (previously 4) Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_PIN2     8  // (preivously 5)
+
+#define TRIGGER_PIN3  10  //(previously 6)Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_PIN3     12  //(previously 7)
+
+#define LOX1_ADDRESS 0x30
+#define LOX2_ADDRESS 0x31
+#define LOX3_ADDRESS 0x32
+#define LOX4_ADDRESS 0x33
+#define LOX5_ADDRESS 0x34
+#define LOX6_ADDRESS 0x35
+
+#define SHT_LOX1 3
+#define SHT_LOX2 5
+#define SHT_LOX3 7
+#define SHT_LOX4 9
+#define SHT_LOX5 11
+#define SHT_LOX6 13
+
+#define TIMING_PIN 14 
+
+Adafruit_VL6180X lox1 = Adafruit_VL6180X();
+Adafruit_VL6180X lox2 = Adafruit_VL6180X();
+Adafruit_VL6180X lox3 = Adafruit_VL6180X();
+Adafruit_VL6180X lox4 = Adafruit_VL6180X();
+Adafruit_VL6180X lox5 = Adafruit_VL6180X();
+Adafruit_VL6180X lox6 = Adafruit_VL6180X();
+
+
+Feedback360Servo Lmotor;
+Feedback360Servo Rmotor;
+
+#define MAX_DISTANCE 400 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
+
+
+NewPing sonar1(TRIGGER_PIN1, ECHO_PIN1, MAX_DISTANCE);// NewPing setup of pins and maximum distance.
+NewPing sonar2(TRIGGER_PIN2, ECHO_PIN2, MAX_DISTANCE);
+NewPing sonar3(TRIGGER_PIN3, ECHO_PIN3, MAX_DISTANCE);
+
+typedef enum {RUN_MODE_DEFAULT, RUN_MODE_TIMED, RUN_MODE_ASYNC, RUN_MODE_GPIO, RUN_MODE_CONT} runmode_t;
+
+runmode_t run_mode = RUN_MODE_DEFAULT;
+uint8_t show_command_list = 1;
+
+//==========================================================================
+// Define some globals used in the continuous range mode
+// Note: going to start table drive this part, may back up and do the rest later
+Adafruit_VL6180X *sensors[] = {&lox1, &lox2,&lox3,&lox4,&lox5,&lox6};
+const uint8_t COUNT_SENSORS = sizeof(sensors) / sizeof(sensors[1]);
+// if any are < 0 will poll instead
+uint8_t  tempRange;
+uint8_t  tempRange2;
+uint8_t  tempRange3;
+uint8_t  tempRange4;
+uint8_t  tempRange5;
+uint8_t  tempRange6;
+
+uint8_t         sensor_ranges[COUNT_SENSORS];   //incomplete - add more for
+uint8_t         sensor_status[COUNT_SENSORS];    // sensor range and status and temp range
+uint8_t         sensor_ranges2[COUNT_SENSORS ];
+uint8_t         sensor_status2[COUNT_SENSORS];
+uint8_t         sensor_ranges3[COUNT_SENSORS ];
+uint8_t         sensor_status3[COUNT_SENSORS];
+uint8_t         sensor_ranges4[COUNT_SENSORS ];
+uint8_t         sensor_status4[COUNT_SENSORS];
+uint8_t         sensor_ranges5[COUNT_SENSORS ];
+uint8_t         sensor_status5[COUNT_SENSORS];
+uint8_t         sensor_ranges6[COUNT_SENSORS ];
+uint8_t         sensor_status6[COUNT_SENSORS];
+// Could do with uint8_t for 8 sensors, but just in case...
+const uint16_t  ALL_SENSORS_PENDING = ((1 << COUNT_SENSORS) - 1);
+uint16_t        sensors_pending = ALL_SENSORS_PENDING;
+uint32_t        sensor_last_cycle_time;
+
+
+void setID() {
+  // all reset
+  digitalWrite(SHT_LOX1, LOW);
+  digitalWrite(SHT_LOX2, LOW);
+  digitalWrite(SHT_LOX3, LOW);
+  digitalWrite(SHT_LOX4, LOW);
+  digitalWrite(SHT_LOX5, LOW);
+  digitalWrite(SHT_LOX6, LOW);
+  delay(10);
+
+  // all unreset
+  digitalWrite(SHT_LOX1, HIGH);
+  digitalWrite(SHT_LOX2, HIGH);
+  digitalWrite(SHT_LOX3, HIGH);
+  digitalWrite(SHT_LOX4, HIGH);
+  digitalWrite(SHT_LOX5, HIGH);
+  digitalWrite(SHT_LOX6, HIGH);
+  delay(10);
+
+  // activating LOX1 and reseting LOX2
+  digitalWrite(SHT_LOX1, HIGH);
+  digitalWrite(SHT_LOX2, LOW);
+  digitalWrite(SHT_LOX3, LOW);
+  digitalWrite(SHT_LOX4, LOW);
+  digitalWrite(SHT_LOX5, LOW);
+  digitalWrite(SHT_LOX6, LOW);
+
+ if (!lox1.begin()) {
+    Serial.println(F("Failed to boot first VL6180X"));
+    while (1);
+  }
+  lox1.setAddress(LOX1_ADDRESS);
+  delay(10);
+
+  // activating LOX2
+  digitalWrite(SHT_LOX2, HIGH);
+  delay(10);
+
+  //initing LOX2
+  if (!lox2.begin()) {
+    Serial.println(F("Failed to boot second VL6180X"));
+    while (1);
+  }
+  lox2.setAddress(LOX2_ADDRESS);
+
+  // activating LOX3
+  digitalWrite(SHT_LOX3, HIGH);
+  delay(10);
+
+  //initing LOX3
+  if (!lox3.begin()) {
+    Serial.println(F("Failed to boot third VL6180X"));
+    while (1);
+  }
+  lox3.setAddress(LOX3_ADDRESS);
+/////////////
+  // activating LOX4
+  digitalWrite(SHT_LOX4, HIGH);
+  delay(10);
+
+  //initing LOX4
+  if (!lox4.begin()) {
+    Serial.println(F("Failed to boot fourth VL6180X"));
+    while (1);
+  }
+  lox4.setAddress(LOX4_ADDRESS);
+
+ digitalWrite(SHT_LOX5, HIGH);
+  delay(10);
+
+if (!lox5.begin()) {
+    Serial.println(F("Failed to boot fourth VL6180X"));
+    while (1);
+  }
+  lox5.setAddress(LOX5_ADDRESS);
+
+   digitalWrite(SHT_LOX6, HIGH);
+  delay(10);
+
+if (!lox6.begin()) {
+    Serial.println(F("Failed to boot fourth VL6180X"));
+    while (1);
+  }
+  lox6.setAddress(LOX6_ADDRESS);
+  
+}
+
+void readSensor(Adafruit_VL6180X &vl) {
+ uint8_t status5;
+ uint8_t status2;
+  //float lux = vl.readLux(VL6180X_ALS_GAIN_5);
+
+  uint8_t range = vl.readRange();
+
+  uint8_t status = vl.readRangeStatus();
+ int i=1;
+  if (status == VL6180X_ERROR_NONE) {
+      tempRange = range;//save it for the moment
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : "); 
+      Serial.print(sensor_ranges[i]);
+      Serial.print("mm");
+      delay(100);
+  }
+  else if (status == VL6180X_ERROR_NOCONVERGE && status5 == VL6180X_ERROR_NONE)  {
+    Serial.print("Left Motor Forward and right motor backward");
+       }
+  else if( status == VL6180X_ERROR_NOCONVERGE  && status2 == VL6180X_ERROR_NOCONVERGE){
+ Serial.print("Stop, LEft and Right motor backwards, turn 90 degrees until sensor 3 or 4 noconverge");
+
+}
+}
+
+
+void readSensor2(Adafruit_VL6180X &v2) {
+  uint8_t status6;
+  uint8_t range2 = v2.readRange();
+  uint8_t status2 = v2.readRangeStatus();
+  int i=2;
+ if (status2 == VL6180X_ERROR_NONE) {
+      tempRange2 = range2;//save it for the moment
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : "); 
+      Serial.print(sensor_ranges2[i]);
+      Serial.print("mm");
+      delay(100);
+  }
+  else if (status2 == VL6180X_ERROR_NOCONVERGE && status6 == VL6180X_ERROR_NONE)  {
+    Serial.print("Left Motor Forward and right motor backward");
+       }
+}
+void readSensor3(Adafruit_VL6180X &v3) {
+  uint8_t range3 = v3.readRange();
+  uint8_t status4;
+  uint8_t status3 = v3.readRangeStatus();
+  int i=3;
+  if ( status3 == VL6180X_ERROR_NOCONVERGE  && status4 == VL6180X_ERROR_NONE ) {
+  Serial.print( " right Motor Forward and leftp motor backward ");
+}
+else if (status3  == VL6180X_ERROR_NONE ) {
+  Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : ");        
+        Serial.print(sensor_ranges3[i]);
+        Serial.print(" mm ");;
+}
+}
+
+void readSensor4(Adafruit_VL6180X &v4) {
+  uint8_t status3;
+  uint8_t range4 = v4.readRange();
+  uint8_t status4 = v4.readRangeStatus();
+  int i=4;
+   if ( status4 == VL6180X_ERROR_NOCONVERGE  && status3 == VL6180X_ERROR_NONE ) {
+  Serial.print( " Drive Forward until status 4 == error none");
+}
+else if (status4  == VL6180X_ERROR_NONE ) {
+  Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : ");        
+        Serial.print(sensor_ranges4[i]);
+        Serial.print(" mm ");;
+}
+}
+void readSensor5(Adafruit_VL6180X &v5) {
+  uint8_t range5 = v5.readRange();
+  uint8_t status5 = v5.readRangeStatus();
+  int i=5;
+ if (status5 == VL6180X_ERROR_NONE) {
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : ");        
+        Serial.print(sensor_ranges5[i]);
+        Serial.print(" mm ");
+     tempRange5 = range5;//save it for the moment
+   // Serial.print(sensor_ranges2[i]);
+   delay(100);
+  }
+  else {
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" Off Surface");
+        delay(100);
+       }
+}
+void readSensor6(Adafruit_VL6180X &v6) {
+  uint8_t range6 = v6.readRange();
+  uint8_t status6 = v6.readRangeStatus();
+  int i=6;
+ if (status6 == VL6180X_ERROR_NONE) {
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" : ");        
+        Serial.print(sensor_ranges6[i]);
+        Serial.print(" mm ");
+     tempRange6 = range6;//save it for the moment
+   // Serial.print(sensor_ranges2[i]);
+   delay(100);
+  }
+  else {
+      Serial.print("Sensor ");
+        Serial.print(i);
+        Serial.print(" Off Surface");
+        delay(100);
+       }
+}
+
+void read_sensors() {
+  readSensor(lox1);
+  sensor_ranges[1]=tempRange;//save it now
+   Serial.println();
+}
+void read_sensors2() {
+  readSensor2(lox2);
+  sensor_ranges2[2]=tempRange2; //save it now 
+   Serial.println();
+} 
+void read_sensors3() {
+  readSensor3(lox3);
+  sensor_ranges3[3]=tempRange3; //save it now 
+   Serial.println();
+} 
+void read_sensors4() {
+  readSensor4(lox4);
+  sensor_ranges4[4]=tempRange4; //save it now 
+   Serial.println();
+} 
+void read_sensors5() {
+  readSensor5(lox5);
+  sensor_ranges5[5]=tempRange5; //save it now 
+   Serial.println();
+} 
+void read_sensors6() {
+  readSensor6(lox6);
+  sensor_ranges6[6]=tempRange6; //save it now 
+   Serial.println();
+} 
+
+
+   
+//===============================================================
+// Setup
+//===============================================================
+
+void setup() {
+
+  const int proxValue = 30;
+  
+  Serial.begin(9600); // Open serial monitor at 115200 baud to see ping results.
+
+   // wait until serial port opens for native USB devices
+  while (! Serial) {
+    delay(1);
+  }
+
+  pinMode(SHT_LOX1, OUTPUT);
+  pinMode(SHT_LOX2, OUTPUT);
+  pinMode(SHT_LOX3, OUTPUT);
+  pinMode(SHT_LOX4, OUTPUT);
+  pinMode(SHT_LOX5, OUTPUT);
+  pinMode(SHT_LOX6, OUTPUT);
+
+
+  // Enable timing pin so easy to see when pass starts and ends
+  pinMode(TIMING_PIN, OUTPUT);
+#ifdef GPIO_LOX1
+  // If we defined GPIO pins, enable them as PULL UP
+  pinMode(GPIO_LOX1, INPUT_PULLUP);
+  pinMode(GPIO_LOX2, INPUT_PULLUP);
+  pinMode(GPIO_LOX3, INPUT_PULLUP);
+  pinMode(GPIO_LOX4, INPUT_PULLUP);
+  pinMode(GPIO_LOX5, INPUT_PULLUP);
+  pinMode(GPIO_LOX6, INPUT_PULLUP);
+#endif
+
+  Serial.println("Shutdown pins inited...");
+
+  digitalWrite(SHT_LOX1, LOW);
+  digitalWrite(SHT_LOX2, LOW);
+  digitalWrite(SHT_LOX3, LOW);
+  digitalWrite(SHT_LOX4, LOW);
+  digitalWrite(SHT_LOX5, LOW);//
+  digitalWrite(SHT_LOX6, LOW);
+
+  digitalWrite(TIMING_PIN, LOW);
+  Serial.println("All in reset mode...(pins are low)");
+
+
+  Serial.println("Starting...");
+  setID(); 
+}
+
+//===============================================================
+// Loop
+//===============================================================
+
+void loop() {
+
+  int proxValue = 30;
+  
+  delay(100);                      // Wait 50ms between pings (about 20 pings/sec). 29ms should be the shortest delay between pings.
+  unsigned int uS1 = sonar1.ping(); // Send ping, get ping time in microseconds (uS).
+  unsigned int cm1 = uS1 / US_ROUNDTRIP_CM;
+  Serial.print("Ultrasonic Sensor 1: ");
+  Serial.print (cm1) ; // Convert ping time to distance in cm and print result (0 = outside set distance range)
+  Serial.println("cm");
+
+   delay(100);                      // Wait 50ms between pings (about 20 pings/sec). 29ms should be the shortest delay between pings.
+  unsigned int uS2 = sonar2.ping(); // Send ping, get ping time in microseconds (uS).
+  unsigned int cm2 = uS2 / US_ROUNDTRIP_CM;
+  Serial.print("Ultrasonic Sensor 2: ");
+  Serial.print (cm2) ; // Convert ping time to distance in cm and print result (0 = outside set distance range)
+  Serial.println("cm");
+
+   delay(100);                      // Wait 50ms between pings (about 20 pings/sec). 29ms should be the shortest delay between pings.
+  unsigned int uS3 = sonar3.ping(); // Send ping, get ping time in microseconds (uS).
+  unsigned int cm3 = uS3 / US_ROUNDTRIP_CM;
+  Serial.print("Ultrasonic Sensor 3: ");
+  Serial.print (cm3) ; // Convert ping time to distance in cm and print result (0 = outside set distance range)
+  Serial.println("cm");
+
+   bool setSpeed(int16_t speed_rpm);
+
+   if (cm1 < proxValue) {
+    Lmotor.setSpeed(-120);
+    Rmotor.setSpeed(-120);
+   }
+
+   if (cm2 < proxValue) {
+    Lmotor.setSpeed(-120);
+    Rmotor.setSpeed(-120);
+   }
+
+   if (cm3 < proxValue) {
+    Lmotor.setSpeed(120);
+    Rmotor.setSpeed(-120);
+   }
+
+read_sensors();
+read_sensors2();
+read_sensors3();
+read_sensors4();
+read_sensors5();
+read_sensors6();
+}

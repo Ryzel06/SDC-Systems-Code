@@ -1,0 +1,76 @@
+
+#include "sdc_macros.h"
+#include "Feedback360Servo.h"
+
+//NewPing ultra_1(2, 3, 400);
+
+using namespace feedback_servo;
+
+double map_d(double x, double in_min, double in_max, double out_min, double out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+Feedback360Servo LF;
+Feedback360Servo LB;
+Feedback360Servo RF;
+Feedback360Servo RB;
+
+void setup()
+{
+    Serial.begin(9600);
+    LF.begin(2, 3);
+    LB.begin(4, 5);
+    RF.begin(6, 7);
+    RB.begin(8, 9);
+    
+}
+/***********************************************/
+void loop()
+{
+    String sig = input("Enter signal");
+    char input_c = sig.charAt(0);
+    int input_length = sig.length();
+    switch(input_c){
+        case 'F': 
+            if(input_length >= 3){
+                uint8_t hund = sig.charAt(1) - 48;
+                uint8_t tens = sig.charAt(2) - 48;
+                uint8_t ones = sig.charAt(3) - 48;
+                uint8_t speed = hund * 100 + tens * 10 + ones;
+                LF.setSpeed(speed);
+                LB.setSpeed(speed);
+                RF.setSpeed(speed);
+                RB.setSpeed(speed);
+            }else {
+                Serial.println("invalid input1");
+                break;
+            }
+            Serial.println("F recieved");
+            break;
+        case 'B':
+            if(input_length >= 3){
+                uint8_t hund = sig.charAt(1) - 48;
+                uint8_t tens = sig.charAt(2) - 48;
+                uint8_t ones = sig.charAt(3) - 48;
+                uint8_t speed = hund * 100 + tens * 10 + ones;
+                LF.setSpeed(-speed);
+                LB.setSpeed(-speed);
+                RF.setSpeed(-speed);
+                RB.setSpeed(-speed);
+            }else{
+                Serial.println("invalid input1");
+                break;
+            }
+            Serial.println("B recieved");
+            break;
+        case '0':
+            LF.setSpeed(-speed);
+            LB.setSpeed(-speed);
+            RF.setSpeed(-speed);
+            RB.setSpeed(-speed);
+            Serial.println("0 recieved");
+            break;
+        default:
+            Serial.println("invalid input");
+    }
+}
